@@ -41,6 +41,9 @@ class SmarterConfig{
         static void onConnectCommand();
         static String wiFiStatus();
         static void startWiFiHooks();
+        static void initializeFS();
+        static bool validateWiFi();
+        static void saveWiFi();
 };
 
 #endif

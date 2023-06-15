@@ -1,8 +1,10 @@
 #include <esp_task_wdt.h>
+#include "soc/rtc_wdt.h"
 #include "SmarterConfig.h"
 #include <NimBLEDevice.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
+#include <LITTLEFS.h>
 
 namespace Configure
 {
@@ -90,18 +92,36 @@ namespace Configure
             Serial.print("Command Parameter received: ");
             Serial.println(pCharacteristic->getValue().c_str());
 
-            std::string incomingCommand = pCharacteristic->getValue();
-            if (incomingCommand == "scan")
+            std::string incomingJson = pCharacteristic->getValue();
+            StaticJsonDocument<512> doc;
+            DeserializationError err = deserializeJson(doc, incomingJson);
+            
+            if(err){
+                StaticJsonDocument<512> errJson;
+                auto errorMsg = String(err.c_str());
+                Serial.print("Error reading command ");
+                Serial.print(incomingJson.c_str());
+                Serial.print(" --- ");
+                Serial.println(errorMsg);
+                errJson["error"] = String(errorMsg);
+                serializeJson(errJson, commandResponse);
+                return;
+            }
+
+            String cmd = doc["c"];
+            if (cmd == "scan")
             {
                 Serial.println("Scan command");
                 SmarterConfig::regenerateWiFiJson = true;
             }
-            else if (incomingCommand == "connect")
+            else if (cmd == "connect")
             {
                 Serial.println("Storing settings...");
                 commandResponse = "trying to store";
-                SmarterConfig::ssid = "MYSSID";
-                SmarterConfig::password = "MYPASS";
+                String ssidTmp = doc["ssid"];
+                String passTmp = doc["password"];
+                SmarterConfig::ssid = ssidTmp;
+                SmarterConfig::password = passTmp;
             }
             else
             {
@@ -196,21 +216,21 @@ void SmarterConfig::startWiFiHooks()
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
                     updateWiFiStatus=true;
-                    wifiStatusJson = "{\"status\": \"connected\"}";
-                 }, ARDUINO_EVENT_WIFI_STA_CONNECTED);
+                    wifiStatusJson = "{\"status\": \"connected\"}"; },
+                 ARDUINO_EVENT_WIFI_STA_CONNECTED);
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
                     updateWiFiStatus=true;
-                    wifiStatusJson = "{\"status\": \"disconnected\"}";
-                 }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+                    wifiStatusJson = "{\"status\": \"disconnected\"}"; },
+                 ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     // WiFi.onEvent(wifiEvent, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
     // WiFi.onEvent(wifiEvent, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
                     wifiStatusJson = "{\"status\": \"scanned\"}";
-                    updateWiFiStatus=true;
-                 }, ARDUINO_EVENT_WIFI_SCAN_DONE);
-    //WiFi.onEvent(wifiReady, ARDUINO_EVENT_WIFI_READY);
+                    updateWiFiStatus=true; },
+                 ARDUINO_EVENT_WIFI_SCAN_DONE);
+    // WiFi.onEvent(wifiReady, ARDUINO_EVENT_WIFI_READY);
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
     String ip = WiFi.localIP().toString();
@@ -245,14 +265,89 @@ String SmarterConfig::wiFiStatus()
     return "unknown_wifi";
 }
 
+void SmarterConfig::initializeFS()
+{
+    Serial.println("Setting up filesystem");
+    LittleFS.begin(true);
+    Serial.println("Done setting up filesystem");
+}
+
+bool SmarterConfig::validateWiFi()
+{
+    File config = LittleFS.open("/wifi.json");
+    if (!config)
+    {
+        // No config
+        return false;
+    }
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, config);
+    if (error)
+    {
+        Serial.print("Error reading wifi config: ");
+        Serial.println(error.c_str());
+        return false;
+    }
+
+    String ssid = doc["ssid"];
+    String passwordStr = doc["password"];
+    const char *password;
+    if (passwordStr.length() == 0)
+    {
+        password = NULL;
+    }
+    else
+    {
+        password = passwordStr.c_str();
+    }
+
+    WiFi.begin(ssid.c_str(), password);
+
+    for (long stopAfter = millis() + 60 * 1000;
+             millis() < stopAfter && WiFi.status() != WL_CONNECTED && WiFi.status() != WL_CONNECT_FAILED;)
+        {
+            //ledGreen(millis() % 1000 > 500);
+            yield();
+            rtc_wdt_feed();
+        }
+    
+    if (WiFi.status() == WL_CONNECTED)
+        {
+            Serial.println("Connected to wifi");
+            Serial.print(WiFi.localIP());
+            Serial.print(" - RSSI ");
+            Serial.println(WiFi.RSSI());
+            //ledGreen(true);
+            WiFi.setAutoReconnect(true);
+            awaitingConfig=false;
+            return true;
+        }
+        else
+        {
+            Serial.println("Unable to connect to wifi");
+        }
+
+    return false;
+}
+
 void SmarterConfig::start()
 {
-    shutdownMs = millis() + 5 * 60 * 1000;
+    initializeFS();
+
     NimBLEDevice::init("bletest");
     NimBLEDevice::setPower(ESP_PWR_LVL_P9); /** +9db */
     NimBLEDevice::setSecurityAuth(/*BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM |*/ BLE_SM_PAIR_AUTHREQ_SC);
     Configure::pServer = NimBLEDevice::createServer();
     Configure::pServer->setCallbacks(new Configure::ServerCallbacks());
+
+    if (validateWiFi())
+    {
+        Serial.println("WiFi validated");
+        awaitingConfig = false;
+        return;
+    }
+
+    shutdownMs = millis() + 5 * 60 * 1000;
 
     NimBLEService *costlowService = Configure::pServer->createService(CONFIG_SERVICE);
     NimBLECharacteristic *characteristicCommand = costlowService->createCharacteristic(CHARACTERISTIC_COMMAND,
@@ -323,13 +418,25 @@ void sendCommandResponseString()
 String SmarterConfig::ssid = "";
 String SmarterConfig::password = "";
 
+void SmarterConfig::saveWiFi(){
+    awaitingConfig=false;
+    File out = LittleFS.open("/wifi.json", "w");
+    StaticJsonDocument<512> doc;
+    doc["ssid"] = ssid;
+    doc["password"] = password;
+    serializeJson(doc, out);
+    out.close();
+    Serial.println("WiFi saved.");
+}
+
 void SmarterConfig::bleLoop()
 {
     esp_task_wdt_reset();
+    yield();
     if (millis() > shutdownMs)
     {
         Serial.println("Deep sleep");
-        awaitingConfig=false;
+        awaitingConfig = false;
     }
     else if (regenerateWiFiJson)
     {
@@ -345,18 +452,26 @@ void SmarterConfig::bleLoop()
         String notification = "";
         Configure::characteristicWifiStatus->notify(notification);
         updateWiFiStatus = false;
-    }else if(!ssid.isEmpty()){
+    }
+    else if (!ssid.isEmpty())
+    {
         Serial.println("Connecting to wifi");
         WiFi.begin(ssid, password);
         long started = millis();
-        while(WiFi.status() != WL_CONNECTED && millis()-started<10000){
-            esp_task_wdt_reset();
+        while (WiFi.status() != WL_CONNECTED && millis() - started < 10000)
+        {
+            yield();
+            rtc_wdt_feed();
         }
-        ssid="";
-        password="";
+        
         Serial.print("Wifi is ");
         Serial.println(WiFi.status());
-        Serial.println(WiFi.localIP());
+        
+        if(WiFi.isConnected()){
+            saveWiFi();
+        }
+        ssid = "";
+        password = "";
     }
 
     if (Configure::commandResponse.length() > 0)
@@ -370,10 +485,10 @@ void SmarterConfig::stop()
 {
     awaitingConfig = false;
     Configure::pServer->stopAdvertising();
-    WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
-                 {
-                    
-                 });
+    WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info) {
+
+    });
+    NimBLEDevice::deinit(true);
 }
 
 String SmarterConfig::scanWiFi()
