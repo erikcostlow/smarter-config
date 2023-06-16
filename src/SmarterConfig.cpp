@@ -117,7 +117,7 @@ namespace Configure
             else if (cmd == "connect")
             {
                 Serial.println("Storing settings...");
-                commandResponse = "trying to store";
+                commandResponse = "{\"s\": \"connecting\"}";
                 String ssidTmp = doc["ssid"];
                 String passTmp = doc["password"];
                 SmarterConfig::ssid = ssidTmp;
@@ -465,10 +465,12 @@ void SmarterConfig::bleLoop()
         }
         
         Serial.print("Wifi is ");
-        Serial.println(WiFi.status());
+        Serial.println(wiFiStatus());
         
         if(WiFi.isConnected()){
             saveWiFi();
+        }else{
+            Serial.println("WiFi did not succeed");
         }
         ssid = "";
         password = "";
