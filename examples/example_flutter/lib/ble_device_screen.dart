@@ -50,6 +50,7 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
     }
     commandResponseCallback!.cancel();
     wifiStatusCallback.cancel();
+    _password.dispose();
   }
 
   late BluetoothCharacteristic _commandCharacteristic;
@@ -140,8 +141,32 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
       setState(() {
         FLog.info(text: "Finished receiving with: $_commandResponseBuffer");
       });
+      Map map = json.decode(_commandResponseBuffer.toString());
+      FLog.info(text: "Map is $map");
+      if (map.containsKey("nearby")) {
+        ssids.clear();
+        var aps = map['nearby'];
+        for (var ap in aps) {
+          var ssid = ap['ssid'];
+          var rssi = ap['rssi'];
+          if (ssids.containsKey(ssid)) {
+            if (rssi > ssids[ssid]) {
+              rssi = ssids[ssid];
+            }
+          }
+          ssids[ssid] = rssi;
+        }
+        setState(() {
+          FLog.info(text: 'Done reading wifi scan');
+        });
+      } else {
+        FLog.info(text: 'Not a wifi scan response');
+      }
     }
   }
+
+  var _password = TextEditingController();
+  var ssids = Map<String, int>(); //name, rssi
 
   @override
   Widget build(BuildContext context) {
@@ -167,10 +192,48 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
         Text("Wifi Status: $_wifiStatus"),
         TextButton(
             onPressed: () {
+              _commandResponseBuffer.clear();
               var value = utf8.encode("{\"c\": \"scan\"}");
               _commandCharacteristic.write(value);
             },
-            child: Text("Scan WiFi")),
+            child: Text("Scan WiFi ${ssids.length}")),
+        ...ssids.entries.map(
+          (e) {
+            return ElevatedButton(
+              child: Text(e.key),
+              onPressed: () {
+                var dlg = AlertDialog(
+                  title: Text("Connect to ${e.key}"),
+                  content: TextField(
+                    controller: _password,
+                  ),
+                  actions: [
+                    ElevatedButton(
+                        onPressed: () => setState(() {
+                              Navigator.pop(context);
+                            }),
+                        child: Text("Cancel")),
+                    ElevatedButton(
+                        onPressed: () => setState(() {
+                              var cmd = {
+                                "c": "connect",
+                                "ssid": e.key,
+                                "password": _password.text
+                              };
+                              var connectCmdStr = json.encode(cmd);
+                              var connectBle = utf8.encode(connectCmdStr);
+                              _commandCharacteristic.write(connectBle);
+                              Navigator.pop(context);
+                            }),
+                        child: Text("Connect")),
+                  ],
+                );
+
+                showDialog(context: context, builder: (context) => dlg);
+              },
+            );
+          },
+        ).toList(),
         Text(_commandResponseBuffer.toString())
       ]),
     );
