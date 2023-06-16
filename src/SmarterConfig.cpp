@@ -216,18 +216,18 @@ void SmarterConfig::startWiFiHooks()
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
                     updateWiFiStatus=true;
-                    wifiStatusJson = "{\"status\": \"connected\"}"; },
+                    wifiStatusJson = "{\"s\": \"connected\"}"; },
                  ARDUINO_EVENT_WIFI_STA_CONNECTED);
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
                     updateWiFiStatus=true;
-                    wifiStatusJson = "{\"status\": \"disconnected\"}"; },
+                    wifiStatusJson = "{\"s\": \"disconnected\"}"; },
                  ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     // WiFi.onEvent(wifiEvent, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
     // WiFi.onEvent(wifiEvent, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
-                    wifiStatusJson = "{\"status\": \"scanned\"}";
+                    wifiStatusJson = "{\"s\": \"scanned\"}";
                     updateWiFiStatus=true; },
                  ARDUINO_EVENT_WIFI_SCAN_DONE);
     // WiFi.onEvent(wifiReady, ARDUINO_EVENT_WIFI_READY);
@@ -269,6 +269,7 @@ void SmarterConfig::initializeFS()
 {
     Serial.println("Setting up filesystem");
     LittleFS.begin(true);
+    LittleFS.format();
     Serial.println("Done setting up filesystem");
 }
 
@@ -319,6 +320,7 @@ bool SmarterConfig::validateWiFi()
             Serial.println(WiFi.RSSI());
             //ledGreen(true);
             WiFi.setAutoReconnect(true);
+            delay(50);
             awaitingConfig=false;
             return true;
         }
@@ -468,6 +470,12 @@ void SmarterConfig::bleLoop()
         Serial.println(wiFiStatus());
         
         if(WiFi.isConnected()){
+            String notification = "{\"s\": \"configured\"}";
+            Configure::characteristicWifiStatus->setValue(notification);
+            Configure::characteristicWifiStatus->notify(notification);
+            //Configure::commandResponse = notification;
+            //sendCommandResponseString();
+            delay(100);
             saveWiFi();
         }else{
             Serial.println("WiFi did not succeed");

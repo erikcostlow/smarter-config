@@ -113,15 +113,24 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
         String newValue = String.fromCharCodes(event);
         if (newValue == "") {
           //we're told to re-read the value
-          var newValueInts = await wifiStatusCharacteristic.read();
-          newValue = String.fromCharCodes(newValueInts);
-          FLog.info(text: "  new val $newValue");
-          if (newValue != _wifiStatus) {
-            FLog.info(text: ' new value is $newValue');
-            setState(() {
-              _wifiStatus = newValue;
-            });
+          try {
+            var newValueInts = await wifiStatusCharacteristic.read();
+            newValue = String.fromCharCodes(newValueInts);
+            FLog.info(text: "  new val $newValue");
+            if (newValue != _wifiStatus) {
+              FLog.info(text: ' new value is $newValue');
+              setState(() {
+                _wifiStatus = newValue;
+              });
+            }
+          } catch (e) {
+            FLog.info(text: "Unable to read wifi: $e");
           }
+        } else {
+          FLog.info(text: "Wifi status is $newValue");
+          setState(() {
+            _wifiStatus = newValue;
+          });
         }
       });
     }
@@ -215,6 +224,7 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
                         child: Text("Cancel")),
                     ElevatedButton(
                         onPressed: () => setState(() {
+                              _commandResponseBuffer.clear();
                               var cmd = {
                                 "c": "connect",
                                 "ssid": e.key,
