@@ -474,6 +474,7 @@ void SmarterConfig::bleLoop()
             Configure::characteristicWifiStatus->setValue(notification);
             Configure::characteristicWifiStatus->notify(notification);
             //Configure::commandResponse = notification;
+            
             //sendCommandResponseString();
             delay(100);
             saveWiFi();

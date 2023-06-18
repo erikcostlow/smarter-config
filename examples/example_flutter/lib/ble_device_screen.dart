@@ -85,13 +85,16 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
         characteristicsMap[BLE_UUIDs.CHARACTERISTIC_RESPONSE]!;
 
     FLog.info(text: 'Listening for notify on CommandResponse');
-    await _commandResponseCharacteristic!.setNotifyValue(true);
-    if (commandResponseCallback != null) {
-      commandResponseCallback!.cancel();
+    try {
+      await _commandResponseCharacteristic!.setNotifyValue(true);
+      if (commandResponseCallback != null) {
+        commandResponseCallback!.cancel();
+      }
+      commandResponseCallback = _commandResponseCharacteristic.value
+          .listen(onCommandResponseNotification);
+    } catch (err) {
+      FLog.info(text: 'Unable to listen for command response: $err');
     }
-    commandResponseCallback = _commandResponseCharacteristic.value
-        .listen(onCommandResponseNotification);
-
     var wifiStatusCharacteristic =
         characteristicsMap[BLE_UUIDs.CHARACTERISTIC_WIFI_STATUS];
     if (wifiStatusCharacteristic == null) {
@@ -109,7 +112,6 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
           wifiStatusCharacteristic.onValueChangedStream.listen((event) async {
         FLog.info(text: "wifi status was notified");
 
-        //READING THE VALUE CALLS THIS AGAIN. FIX INFINITE LOOP.
         String newValue = String.fromCharCodes(event);
         if (newValue == "") {
           //we're told to re-read the value
@@ -126,8 +128,8 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
           } catch (e) {
             FLog.info(text: "Unable to read wifi: $e");
           }
-        } else {
-          FLog.info(text: "Wifi status is $newValue");
+        } else if (newValue != _wifiStatus) {
+          FLog.info(text: "Wifi status from $_wifiStatus to $newValue");
           setState(() {
             _wifiStatus = newValue;
           });
