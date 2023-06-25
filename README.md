@@ -11,6 +11,41 @@ SmarterConfig is BLE-based configuration for communication between an app and a 
 1. [WiFiProv](https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFiProv/examples/WiFiProv/WiFiProv.ino) - WiFiProv did not work.
 1. Custom device web-app - end user configuration is a bit harder, as they need to connect to your custom SSID and use the app.
 
+## Requirements
+SmarterConfig requires several libraries. A sample platformio.ini
+```ini
+[env]
+monitor_speed = 115200
+
+[env:esp32dev]
+platform = espressif32
+board = esp32dev
+board_build.filesystem = littlefs
+framework =
+	arduino
+#	espidf
+platform_packages = framework-arduinoespressif32 @ https://github.com/espressif/arduino-esp32.git#2.0.9
+build_type = debug
+monitor_filters = esp32_exception_decoder
+lib_deps = 
+	bblanchon/ArduinoJson@^6.19.2
+	djgrrr/Int64String@^1.1.1
+	h2zero/NimBLE-Arduino@^1.4.1
+board_build.partitions = customPartition.csv
+build_flags =
+	-DARDUINO_ARCH_ESP32
+```
+
+Custom Partitions, because BLE libraries are large.
+```csv
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x1C0000,
+app1,     app,  ota_1,   0x1D0000,0x1C0000,
+spiffs,   data, spiffs,  0x390000,0x70000,
+```
+
 ## Examples
 
 See examples/provision.cpp for a sample device app.
