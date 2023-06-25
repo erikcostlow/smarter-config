@@ -44,6 +44,7 @@ class SmarterConfig{
         static void initializeFS();
         static bool validateWiFi();
         static void saveWiFi();
+        static void deepSleep();
 };
 
 #endif

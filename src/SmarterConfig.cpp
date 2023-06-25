@@ -431,14 +431,18 @@ void SmarterConfig::saveWiFi(){
     Serial.println("WiFi saved.");
 }
 
+void SmarterConfig::deepSleep(){
+    Serial.println("Deep sleep");
+    awaitingConfig = false;
+}
+
 void SmarterConfig::bleLoop()
 {
     esp_task_wdt_reset();
     yield();
     if (millis() > shutdownMs)
     {
-        Serial.println("Deep sleep");
-        awaitingConfig = false;
+        deepSleep();
     }
     else if (regenerateWiFiJson)
     {
@@ -473,9 +477,9 @@ void SmarterConfig::bleLoop()
             String notification = "{\"s\": \"configured\"}";
             Configure::characteristicWifiStatus->setValue(notification);
             Configure::characteristicWifiStatus->notify(notification);
-            //Configure::commandResponse = notification;
+            Configure::commandResponse = notification;
             
-            //sendCommandResponseString();
+            sendCommandResponseString();
             delay(100);
             saveWiFi();
         }else{

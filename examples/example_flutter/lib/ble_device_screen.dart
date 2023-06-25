@@ -57,6 +57,7 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
   late BluetoothCharacteristic _commandResponseCharacteristic;
   late StreamSubscription<List<int>>? commandResponseCallback = null;
   final StringBuffer _commandResponseBuffer = StringBuffer("No command yet...");
+  String _commandResponseFinal = "No command yet...";
   String _wifiStatus = "Unknown connection";
 
   late StreamSubscription<List<int>> wifiStatusCallback;
@@ -109,25 +110,24 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
       await wifiStatusCharacteristic.setNotifyValue(true);
 
       wifiStatusCallback =
-          wifiStatusCharacteristic.onValueChangedStream.listen((event) async {
+          wifiStatusCharacteristic.onValueChangedStream.listen((event) {
         FLog.info(text: "wifi status was notified");
 
         String newValue = String.fromCharCodes(event);
         if (newValue == "") {
           //we're told to re-read the value
-          try {
-            var newValueInts = await wifiStatusCharacteristic.read();
+          wifiStatusCharacteristic.read().then((value) {
             newValue = String.fromCharCodes(newValueInts);
             FLog.info(text: "  new val $newValue");
             if (newValue != _wifiStatus) {
-              FLog.info(text: ' new value is $newValue');
+              FLog.info(text: ' new wifi is $newValue from $_wifiStatus');
               setState(() {
                 _wifiStatus = newValue;
               });
             }
-          } catch (e) {
-            FLog.info(text: "Unable to read wifi: $e");
-          }
+          }).onError((error, stackTrace) {
+            FLog.info(text: "Unable to read wifi: $error");
+          });
         } else if (newValue != _wifiStatus) {
           FLog.info(text: "Wifi status from $_wifiStatus to $newValue");
           setState(() {
@@ -151,8 +151,10 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
     if (incoming == "") {
       setState(() {
         FLog.info(text: "Finished receiving with: $_commandResponseBuffer");
+        _commandResponseFinal = _commandResponseBuffer.toString();
+        _commandResponseBuffer.clear();
       });
-      Map map = json.decode(_commandResponseBuffer.toString());
+      Map map = json.decode(_commandResponseFinal);
       FLog.info(text: "Map is $map");
       if (map.containsKey("nearby")) {
         ssids.clear();
@@ -246,7 +248,7 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
             );
           },
         ).toList(),
-        Text(_commandResponseBuffer.toString())
+        Text(_commandResponseFinal)
       ]),
     );
   }
