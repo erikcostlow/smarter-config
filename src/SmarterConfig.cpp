@@ -209,35 +209,32 @@ long SmarterConfig::shutdownMs = millis() + 5 * 60 * 1000;
 bool SmarterConfig::awaitingConfig = true;
 bool SmarterConfig::regenerateWiFiJson = false;
 bool SmarterConfig::updateWiFiStatus = false;
-String SmarterConfig::wifiStatusJson = "{\"status\": \"disconnected\"}";
+String SmarterConfig::wifiStatusStr = "unknown_wifi";
 
 void SmarterConfig::startWiFiHooks()
 {
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
                     updateWiFiStatus=true;
-                    wifiStatusJson = "{\"s\": \"connected\"}"; },
+                    wifiStatusStr = "connected"; },
                  ARDUINO_EVENT_WIFI_STA_CONNECTED);
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
                     updateWiFiStatus=true;
-                    wifiStatusJson = "{\"s\": \"disconnected\"}"; },
+                    wifiStatusStr = "disconnected"; },
                  ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     // WiFi.onEvent(wifiEvent, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
     // WiFi.onEvent(wifiEvent, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
-                    wifiStatusJson = "{\"s\": \"scanned\"}";
+                    wifiStatusStr = "scanned";
                     updateWiFiStatus=true; },
                  ARDUINO_EVENT_WIFI_SCAN_DONE);
     // WiFi.onEvent(wifiReady, ARDUINO_EVENT_WIFI_READY);
     WiFi.onEvent([](WiFiEvent_t wifi_event, WiFiEventInfo_t wifi_info)
                  {
     String ip = WiFi.localIP().toString();
-    String json = "{\"status\": \"connected\", \"ip\": ";
-    json += ip;
-    json += "\"}";
-    wifiStatusJson = json;
+    wifiStatusStr = ip;
     updateWiFiStatus = true; },
                  ARDUINO_EVENT_WIFI_STA_GOT_IP);
 }
@@ -359,7 +356,7 @@ void SmarterConfig::start()
                                                                              NIMBLE_PROPERTY::NOTIFY);
     Configure::characteristicWifiStatus = costlowService->createCharacteristic(CHARACTERISTIC_WIFI_STATUS,
                                                                                NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-    Configure::characteristicWifiStatus->setValue(wiFiStatus());
+    Configure::characteristicWifiStatus->setValue(wifiStatusStr);
 
     costlowService->start();
     NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
@@ -453,10 +450,9 @@ void SmarterConfig::bleLoop()
     else if (updateWiFiStatus)
     {
         Serial.println("Updating wifi status");
-        Serial.println(wifiStatusJson);
-        Configure::characteristicWifiStatus->setValue(wifiStatusJson);
-        String notification = "";
-        Configure::characteristicWifiStatus->notify(notification);
+        Serial.println(wifiStatusStr);
+        Configure::characteristicWifiStatus->setValue(wifiStatusStr);
+        Configure::characteristicWifiStatus->notify(wifiStatusStr);
         updateWiFiStatus = false;
     }
     else if (!ssid.isEmpty())

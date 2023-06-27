@@ -33,7 +33,7 @@ class SmarterConfig{
         static bool awaitingConfig;
         static long shutdownMs;
         static bool updateWiFiStatus;
-        static String wifiStatusJson;
+        static String wifiStatusStr;
 
         static void extendPowerOffMs(int ms);
         static void bleLoop();

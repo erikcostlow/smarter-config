@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:f_logs/f_logs.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'ble_uuids.dart' as BLE_UUIDs;
 
@@ -114,25 +113,13 @@ class _BleDeviceScreenState extends State<BleDeviceScreen> {
         FLog.info(text: "wifi status was notified");
 
         String newValue = String.fromCharCodes(event);
-        if (newValue == "") {
-          //we're told to re-read the value
-          wifiStatusCharacteristic.read().then((value) {
-            newValue = String.fromCharCodes(newValueInts);
-            FLog.info(text: "  new val $newValue");
-            if (newValue != _wifiStatus) {
-              FLog.info(text: ' new wifi is $newValue from $_wifiStatus');
-              setState(() {
-                _wifiStatus = newValue;
-              });
-            }
-          }).onError((error, stackTrace) {
-            FLog.info(text: "Unable to read wifi: $error");
-          });
-        } else if (newValue != _wifiStatus) {
-          FLog.info(text: "Wifi status from $_wifiStatus to $newValue");
+        if (newValue != _wifiStatus) {
+          FLog.info(text: ' new wifi is $newValue from $_wifiStatus');
           setState(() {
             _wifiStatus = newValue;
           });
+        } else {
+          FLog.info(text: "wifi status unchanged: $newValue");
         }
       });
     }
