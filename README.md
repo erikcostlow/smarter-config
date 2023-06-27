@@ -6,6 +6,12 @@ A challenge of ESP32 devices is getting them their first WiFi credentials and re
 
 SmarterConfig is BLE-based configuration for communication between an app and a single device.
 
+Specifically the reason for SmarterConfig is several factors:
+
+1. The ability to configure a single device, in the event that multiple ESP32s are nearby.
+1. A status coming back to an app, showing success or failure of connecting to the wifi network.
+1. Storing credentials on the device via LittleFS rather than direct EEPROM.
+
 ## Comparison to other approaches
 1. [SmartConfig](https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFi/examples/WiFiSmartConfig/WiFiSmartConfig.ino) - unlike SmartConfig, the network BSSID is not necessary. The ESP32 controls its own WiFi so the app can be connected to 5ghz or a different network.
 1. [WiFiProv](https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFiProv/examples/WiFiProv/WiFiProv.ino) - WiFiProv did not work.
