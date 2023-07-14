@@ -205,6 +205,7 @@ namespace Configure
     NimBLECharacteristic *characteristicWifiStatus;
 }
 
+String SmarterConfig::name = "bletest";
 long SmarterConfig::shutdownMs = millis() + 5 * 60 * 1000;
 bool SmarterConfig::awaitingConfig = true;
 bool SmarterConfig::regenerateWiFiJson = false;
@@ -333,7 +334,7 @@ void SmarterConfig::start()
 {
     initializeFS();
     String name = namePrefix;
-    NimBLEDevice::init(name);
+    NimBLEDevice::init(name.c_str());
     NimBLEDevice::setPower(ESP_PWR_LVL_P9); /** +9db */
     NimBLEDevice::setSecurityAuth(/*BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM |*/ BLE_SM_PAIR_AUTHREQ_SC);
     Configure::pServer = NimBLEDevice::createServer();

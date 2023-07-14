@@ -28,7 +28,7 @@ class SmarterConfig{
 
         static String ssid;
         static String password;
-        static String name = "bletest";
+        static String name;
 
     private:
         static bool awaitingConfig;
