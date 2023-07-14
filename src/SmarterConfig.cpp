@@ -333,7 +333,7 @@ bool SmarterConfig::validateWiFi()
 void SmarterConfig::start()
 {
     initializeFS();
-    NimBLEDevice::init(name.c_str());
+    NimBLEDevice::init(name);
     NimBLEDevice::setPower(ESP_PWR_LVL_P9); /** +9db */
     NimBLEDevice::setSecurityAuth(/*BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM |*/ BLE_SM_PAIR_AUTHREQ_SC);
     Configure::pServer = NimBLEDevice::createServer();
