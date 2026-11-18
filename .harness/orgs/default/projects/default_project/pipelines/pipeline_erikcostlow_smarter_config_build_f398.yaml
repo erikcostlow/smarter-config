@@ -1,0 +1,50 @@
+pipeline:
+  id: pipeline_erikcostlow_smarter_config_build_f398
+  name: pipeline_erikcostlow_smarter_config_build_f398
+  stages:
+    - name: Build and Test Flutter Example
+      id: build_and_test
+      runtime: cloud
+      platform:
+        os: linux
+        arch: amd64
+      clone:
+        enabled: true
+      cache:
+        enabled: true
+      steps:
+        - name: Install Flutter
+          id: install_flutter
+          run:
+            shell: bash
+            script: |-
+              git clone https://github.com/flutter/flutter.git -b stable --depth 1 /harness/flutter
+              export PATH="/harness/flutter/bin:$PATH"
+              flutter precache
+              flutter --version
+        - name: Install Dependencies
+          id: install_deps
+          run:
+            shell: bash
+            script: |-
+              export PATH="/harness/flutter/bin:$PATH"
+              cd examples/example_flutter
+              flutter pub get
+        - name: Analyze
+          id: analyze
+          run:
+            shell: bash
+            script: |-
+              export PATH="/harness/flutter/bin:$PATH"
+              cd examples/example_flutter
+              flutter analyze
+        - name: Test
+          id: test
+          run:
+            shell: bash
+            script: |-
+              export PATH="/harness/flutter/bin:$PATH"
+              cd examples/example_flutter
+              flutter test
+  tags:
+    onboarding: "true"
